@@ -53,11 +53,6 @@
 #include "../vmobjects/VMObject.h"
 #include "../vmobjects/VMSymbol.h"
 
-const std::string Interpreter::unknownGlobal = "unknownGlobal:";
-const std::string Interpreter::doesNotUnderstand =
-    "doesNotUnderstand:arguments:";
-const std::string Interpreter::escapedBlock = "escapedBlock:";
-
 VMFrame* Interpreter::frame = nullptr;
 VMMethod* Interpreter::method = nullptr;
 
@@ -66,13 +61,12 @@ VMMethod* Interpreter::method = nullptr;
 size_t Interpreter::bytecodeIndexGlobal;
 uint8_t* Interpreter::currentBytecodes;
 
-template <bool PrintBytecodes>
-vm_oop_t Interpreter::Start() {
-#define PROLOGUE(bcCount)                 \
-    {                                     \
-        if constexpr (PrintBytecodes) {   \
-            disassembleMethod();          \
-        }                                 \
+vm_oop_t Interpreter::Start(bool printBytecodes) {
+#define PROLOGUE(bcCount)              \
+    {                                  \
+        if (printBytecodes) {          \
+            disassembleMethod();       \
+        }                              \
         bytecodeIndexGlobal += (bcCount); \
     }
 
@@ -148,7 +142,13 @@ vm_oop_t Interpreter::Start() {
                            &&LABEL_BC_JUMP2_IF_GREATER,
                            &&LABEL_BC_JUMP2_BACKWARD};
 
+#ifdef USE_YK
+    // Yk cannot trace through LLVM indirectbr (which goto* lowers to).
+    // Jump straight to the switch-based dispatch and control-point call.
+    goto YK_DISPATCH_START;
+#else
     goto* loopTargets[currentBytecodes[bytecodeIndexGlobal]];
+#endif
 
     //
     // THIS IS THE former interpretation loop
@@ -673,10 +673,12 @@ LABEL_BC_JUMP2_BACKWARD: {
     bytecodeIndexGlobal -= offset;
 }
     DISPATCH_NOGC();
+
+    // Single control-point trampoline for Yk. All DISPATCH_NOGC/GC paths jump
+    // here when USE_YK is set, giving Yk exactly one call site.
+    YK_DISPATCH_TRAMPOLINE();
 }
 
-template vm_oop_t Interpreter::Start<true>();
-template vm_oop_t Interpreter::Start<false>();
 
 VMFrame* Interpreter::PushNewFrame(VMMethod* method) {
     SetFrame(Universe::NewFrame(GetFrame(), method));

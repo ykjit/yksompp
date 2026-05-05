@@ -127,12 +127,8 @@ void Shell::Start() {
         initialize->Invoke(currentFrame);
 
         // Start the Interpreter
-
-        if (dumpBytecodes > 1) {
-            Interpreter::Start<true>();
-        } else {
-            Interpreter::Start<false>();
-        }
+        // Non-template call: see Interpreter::Start for why the template was removed.
+        Interpreter::Start(dumpBytecodes > 1);
 
         // Save the result of the run method
         it = currentFrame->Pop();

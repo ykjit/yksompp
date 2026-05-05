@@ -61,6 +61,10 @@ private:
     bool supportsClass(const std::string& name);
 
     std::map<std::string, PrimitiveContainer*> primitiveObjects;
-
-    static PrimitiveLoader loader;
+    // Lazy singleton instead of a static data member.
+    // C++ global/static constructors run before main() even starts, so the
+    // original `static PrimitiveLoader loader` would have called new _Array()
+    // etc. before yk_mt_new() had a chance to initialize the Yk shadow stack,
+    // causing a crash.
+    static PrimitiveLoader& GetLoader();
 };

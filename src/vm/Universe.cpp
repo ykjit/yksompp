@@ -70,6 +70,10 @@
 static gc_oop_t prebuildInts[INT_CACHE_MAX_VALUE - INT_CACHE_MIN_VALUE + 1];
 #endif
 
+#ifdef USE_YK
+YkMT* Universe::global_yk_mt = nullptr;
+#endif
+
 #define INT_HIST_SIZE 1
 
 // Here we go:
@@ -141,6 +145,12 @@ void Universe::Shutdown() {
                   << ", " << it->second.noPrimitiveCalls << ", "
                   << it->second.noCalls - it->second.noPrimitiveCalls << endl;
     }
+#endif
+#ifdef USE_YK
+    // Release the meta-tracer before the rest of the VM tears down so Yk can
+    // flush any pending traces and free its internal state cleanly.
+    yk_mt_shutdown(global_yk_mt);
+    global_yk_mt = nullptr;
 #endif
 }
 
@@ -353,14 +363,17 @@ vm_oop_t Universe::interpretMethod(VMObject* receiver, VMInvokable* initialize,
         dumpBytecodes = 2 - trace;
     }
 
-    if (dumpBytecodes > 1) {
-        return Interpreter::Start<true>();
-    }
-    return Interpreter::Start<false>();
+    return Interpreter::Start(dumpBytecodes > 1);
 }
 
 void Universe::initialize(int32_t _argc, char** _argv) {
+#ifdef USE_YK
+    char* yk_err = nullptr;
+    global_yk_mt = yk_mt_new(&yk_err);
+    assert(yk_err == nullptr && "Failed to initialize yk.");
+#endif
     InitializeAllocationLog();
+
 
     heapSize = 1ULL * 1024 * 1024;
 

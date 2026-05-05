@@ -37,6 +37,10 @@
 #include "../vmobjects/ObjectFormats.h"
 #include "Print.h"
 
+#ifdef USE_YK
+#include "Yk.h"
+#endif
+
 class SourcecodeCompiler;
 
 // for runtime debug
@@ -46,6 +50,9 @@ extern uint8_t gcVerbosity;
 using namespace std;
 class Universe {
 public:
+    #ifdef USE_YK
+    static YkMT* global_yk_mt;
+    #endif
     // static methods
     static void Start(int32_t argc, char** argv);
     static void BasicInit();
