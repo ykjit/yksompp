@@ -54,11 +54,13 @@ void YkDestroyDebugStrs(char** strs, size_t bcLen);
         }                                                   \
         goto YK_DISPATCH_START;                             \
     }
-#define YK_DISPATCH_TRAMPOLINE()                               \
-    YK_DISPATCH_START:                                         \
-    yk_mt_control_point(Universe::yk_mt,                       \
-                        &method->yklocs[bytecodeIndexGlobal]); \
-    YK_DEBUG_STR_CALL();                                       \
+#define YK_DISPATCH_TRAMPOLINE()                                          \
+    YK_DISPATCH_START:                                                    \
+    if (!yk_location_is_null(method->yklocs[bytecodeIndexGlobal])) {      \
+        YK_DEBUG_STR_CALL();                                              \
+        yk_mt_control_point(Universe::yk_mt,                              \
+                            &method->yklocs[bytecodeIndexGlobal]);        \
+    }                                                                     \
     switch (currentBytecodes[bytecodeIndexGlobal]) {           \
         case BC_HALT:                                          \
             goto LABEL_BC_HALT;                                \
