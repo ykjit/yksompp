@@ -155,7 +155,7 @@ VMFrame* VMMethod::Invoke(VMFrame* frame) {
     if (yk_is_interpreting()) {
         if (called && yk_location_is_null(yklocs[0])) {
             yklocs[0] = yk_location_new();
-  #if YKLUA_DEBUG_STRS
+  #ifdef YK_DEBUG_STRS
             yk_location_set_debug_str(&yklocs[0], instdebugstrs[0]);
   #endif
         } else if (!called) {
