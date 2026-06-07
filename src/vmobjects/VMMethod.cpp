@@ -41,6 +41,7 @@
 #include "../interpreter/Interpreter.h"
 #include "../interpreter/bytecodes.h"
 #include "../memory/Heap.h"
+#include "../misc/Murmur3Hash.h"
 #include "../misc/defs.h"
 #include "../vm/Globals.h"
 #include "../vm/Print.h"
@@ -106,7 +107,8 @@ VMMethod* VMMethod::CloneForMovingGC() const {
         static_cast<void*>(clone->indexableFields + numIndexableFields));
 #else
     clone->indexableFields = (gc_oop_t*)(&(clone->indexableFields) + 2);
-    clone->bytecodes = (uint8_t*)(clone->indexableFields + numIndexableFields);
+    clone->bytecodes =
+        (uint8_t*)(&(clone->indexableFields) + 2 + numIndexableFields);
 #endif
     // Use of GetNumberOfIndexableFields() is problematic here, because it may
     // be invalid object while cloning/moving within GC
@@ -152,15 +154,15 @@ VMFrame* VMMethod::Invoke(VMFrame* frame) {
     frame->SetBytecodeIndex(Interpreter::GetBytecodeIndex());
 
 #ifdef USE_YK
-    if (yk_is_interpreting()) {
-        if (called && yk_location_is_null(yklocs[0])) {
+    if (called) {
+        if (yk_location_is_null(yklocs[0]) && yk_is_interpreting()) {
             yklocs[0] = yk_location_new();
   #ifdef YK_DEBUG_STRS
             yk_location_set_debug_str(&yklocs[0], instdebugstrs[0]);
   #endif
-        } else if (!called) {
-            called = true;
         }
+    } else {
+        called = true;
     }
 #endif
 
@@ -175,12 +177,12 @@ VMFrame* VMMethod::Invoke1(VMFrame* frame) {
     frame->SetBytecodeIndex(Interpreter::GetBytecodeIndex());
 
 #ifdef USE_YK
-    if (yk_is_interpreting()) {
-        if (called && yk_location_is_null(yklocs[0])) {
+    if (called) {
+        if (yk_location_is_null(yklocs[0]) && yk_is_interpreting()) {
             yklocs[0] = yk_location_new();
-        } else if (!called) {
-            called = true;
         }
+    } else {
+        called = true;
     }
 #endif
 
@@ -751,4 +753,8 @@ bool operator<(const BackJumpPatch& a, const BackJumpPatch& b) {
 void VMMethod::MergeScopeInto(MethodGenerationContext& mgenc) {
     assert(lexicalScope != nullptr);
     mgenc.MergeIntoScope(*lexicalScope);
+}
+
+size_t VMMethod::GetBytecodeHash() const {
+    return murmur3_32(bytecodes, bcLength, 0x00000000);
 }
