@@ -26,8 +26,10 @@
  THE SOFTWARE.
  */
 
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <queue>
 
 #ifdef USE_YK
@@ -155,7 +157,12 @@ public:
         return bytecodes[indx];
     }
 
-    inline void SetBytecode(size_t indx, uint8_t val) { bytecodes[indx] = val; }
+    inline void SetBytecode(size_t indx, uint8_t val) {
+        bytecodes[indx] = val;
+#ifdef UNSAFE_FRAME_OPTIMIZATION
+        hasPushBlockBytecode.reset();
+#endif
+    }
 
 #ifdef USE_YK
     void InitYkLocs(const SourceCoordinate* coords = nullptr,
@@ -165,6 +172,7 @@ public:
 #ifdef UNSAFE_FRAME_OPTIMIZATION
     void SetCachedFrame(VMFrame* frame);
     GCFrame* GetCachedFrame() const;
+    [[nodiscard]] bool HasPushBlockBytecode() const;
 #endif
 
     void WalkObjects(walk_heap_fn /*unused*/) override;
@@ -210,6 +218,9 @@ public:
     [[nodiscard]] inline uint8_t* GetBytecodes() const { return bytecodes; }
 
 private:
+#ifdef USE_YK
+    void setYkLocation(size_t bcIdx);
+#endif
     void inlineInto(MethodGenerationContext& mgenc, const Parser& parser);
     std::priority_queue<BackJump> createBackJumpHeap();
 
@@ -240,6 +251,8 @@ private:
 
 #ifdef UNSAFE_FRAME_OPTIMIZATION
     GCFrame* cachedFrame;
+    bool isDirectlyRecursive{false};
+    mutable std::optional<bool> hasPushBlockBytecode;
 #endif
 
 #ifdef BYTECODE_HEATMAP

@@ -140,13 +140,35 @@ GCFrame* VMMethod::GetCachedFrame() const {
     return cachedFrame;
 }
 
+bool VMMethod::HasPushBlockBytecode() const {
+    if (!hasPushBlockBytecode) {
+        size_t i = 0;
+        while (i < bcLength) {
+            uint8_t const bytecode = bytecodes[i];
+            if (bytecode == BC_PUSH_BLOCK) {
+                hasPushBlockBytecode = true;
+                return true;
+            }
+            i += Bytecode::GetBytecodeLength(bytecode);
+        }
+        hasPushBlockBytecode = false;
+    }
+    return *hasPushBlockBytecode;
+}
+
 void VMMethod::SetCachedFrame(VMFrame* frame) {
+  #ifdef USE_YK
+    // Do not cache recursive method frames
+    if (frame != nullptr && isDirectlyRecursive) {
+        return;
+    }
+  #endif
     cachedFrame = store_with_separate_barrier(frame);
     if (frame != nullptr) {
         frame->SetContext(nullptr);
         frame->SetBytecodeIndex(0);
         frame->ResetStackPointer();
-        write_barrier(this, cachedFrame);
+        write_barrier(this, frame);
     }
 }
 #endif
@@ -155,6 +177,22 @@ VMFrame* VMMethod::Invoke(VMFrame* frame) {
     // since an invokable is able to change/use the frame, we have to write
     // cached values before, and read cached values after calling
     frame->SetBytecodeIndex(Interpreter::GetBytecodeIndex());
+#if USE_YK
+    if (Interpreter::GetMethod() == this && yk_is_interpreting()) {
+        if (yk_location_is_null(yklocs[0])) {
+            yklocs[0] = yk_location_new();
+  #ifdef YK_DEBUG_STRS
+            yk_location_set_debug_str(&yklocs[0], instdebugstrs[0]);
+  #endif
+        }
+    }
+#endif
+
+#if defined(USE_YK) && defined(UNSAFE_FRAME_OPTIMIZATION)
+    if (Interpreter::GetMethod() == this) {
+        isDirectlyRecursive = true;
+    }
+#endif
 
     VMFrame* frm = Interpreter::PushNewFrame(this);
     frm->CopyArgumentsFrom(frame);
@@ -165,6 +203,20 @@ VMFrame* VMMethod::Invoke1(VMFrame* frame) {
     // since an invokable is able to change/use the frame, we have to write
     // cached values before, and read cached values after calling
     frame->SetBytecodeIndex(Interpreter::GetBytecodeIndex());
+
+#if USE_YK
+    if (Interpreter::GetMethod() == this && yk_is_interpreting()) {
+        if (yk_location_is_null(yklocs[0])) {
+            yklocs[0] = yk_location_new();
+        }
+    }
+#endif
+
+#if defined(USE_YK) && defined(UNSAFE_FRAME_OPTIMIZATION)
+    if (Interpreter::GetMethod() == this) {
+        isDirectlyRecursive = true;
+    }
+#endif
 
     VMFrame* frm = Interpreter::PushNewFrame(this);
     frm->SetArgument(0, frame->Top());

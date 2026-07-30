@@ -61,6 +61,9 @@
 #include "../vmobjects/VMString.h"
 #include "../vmobjects/VMVector.h"
 #include "../yk/yk_linkage.h"
+#ifdef USE_YK
+  #include "../yk/YkSOMpp.h"
+#endif
 #include "Globals.h"
 #include "IsValidObject.h"
 #include "LogAllocation.h"
@@ -119,10 +122,6 @@ void Universe::Shutdown() {
     }
 #endif
 
-#ifdef USE_YK
-    YkUniverseShutdown();
-#endif
-
 #ifdef LOG_RECEIVER_TYPES
     std::string file_name_receivers = std::string(bm_name);
     file_name_receivers.append("_receivers.csv");
@@ -154,17 +153,21 @@ void Universe::Shutdown() {
 }
 
 static void printVmConfig() {
-    if (GC_TYPE == GENERATIONAL) {  // NOLINT(misc-redundant-expression)
+    // NOLINTBEGIN(misc-redundant-expression)
+    if (GC_TYPE == GENERATIONAL) {
         cout << "\tgarbage collector: generational\n";
-    } else if (GC_TYPE == COPYING) {  // NOLINT(misc-redundant-expression)
+    } else if (GC_TYPE == COPYING) {
         cout << "\tgarbage collector: copying\n";
-    } else if (GC_TYPE == MARK_SWEEP) {  // NOLINT(misc-redundant-expression)
+    } else if (GC_TYPE == MARK_SWEEP) {
         cout << "\tgarbage collector: mark-sweep\n";
-    } else if (GC_TYPE == DEBUG_COPYING) {  // NOLINT(misc-redundant-expression)
+    } else if (GC_TYPE == DEBUG_COPYING) {
         cout << "\tgarbage collector: debug copying\n";
+    } else if (GC_TYPE == DEBUG_MARK_SWEEP) {
+        cout << "\tgarbage collector: debug mark-sweep\n";
     } else {
         cout << "\tgarbage collector: unknown\n";
     }
+    // NOLINTEND(misc-redundant-expression)
 
     if (USE_TAGGING) {
         cout << "\twith tagged integers\n";
@@ -186,6 +189,9 @@ static void printVmConfig() {
     }
 
     cout << "--------------------------------------\n";
+#ifdef USE_YK
+    YkUniverseShutdown();
+#endif
 }
 
 vector<std::string> Universe::handleArguments(int32_t argc, char** argv) {
@@ -571,7 +577,11 @@ VMClass* Universe::GetBlockClassWithArgs(uint8_t numberOfArguments) {
     return result;
 }
 
-vm_oop_t Universe::GetGlobal(VMSymbol* name) {
+#ifdef USE_YK
+__attribute__((yk_outline))
+#endif
+vm_oop_t
+Universe::GetGlobal(VMSymbol* name) {
     auto it = globals.find(tmp_ptr(name));
     if (it == globals.end()) {
         return nullptr;
@@ -796,8 +806,11 @@ VMArray* Universe::NewArrayList(std::vector<vm_oop_t>& list) {
     return result;
 }
 
-VMBlock* Universe::NewBlock(VMInvokable* method, VMFrame* context,
-                            uint8_t arguments) {
+#ifdef USE_YK
+__attribute__((yk_indirect_inline))
+#endif
+VMBlock*
+Universe::NewBlock(VMInvokable* method, VMFrame* context, uint8_t arguments) {
     auto* result = new (GetHeap<HEAP_CLS>(), 0) VMBlock(method, context);
     result->SetClass(GetBlockClassWithArgs(arguments));
 
